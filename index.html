@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Stroop test</title>
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  margin-top: 50px;
+}
+
+#instruction {
+  font-size: 28px;
+  font-weight: bold;
+}
+
+#guide {
+  margin-top: 15px;
+  font-size: 32px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#word.start {
+  color: black;
+  text-decoration: underline;
+}
+
+#word {
+  font-size: 64px;
+  margin: 40px;
+}
+
+button {
+  font-size: 18px;
+  margin: 5px;
+}
+
+#keymap {
+  margin-top: 40px;
+}
+
+.keybox {
+  display: inline-block;
+  width: 80px;
+  height: 80px;
+  margin: 10px;
+  text-align: center;
+  border: 3px solid #333;
+  border-radius: 10px;
+  line-height: 80px;
+  font-weight: bold;
+  font-size: 32px;
+  user-select: none;
+}
+
+.keybox:active {
+  background-color: #ddd;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Stroopテスト</h1>
+<p id="instruction">色を回答！</p>
+
+<div>
+  <div id="word" class="start">スタートを押してください</div>
+
+  <div id="guide">
+    赤 / 青 / 緑 / 黄 をタップ
+  </div>
+
+  <div style="margin-top: 15px;">
+    <button id="startBtn">スタート</button>
+  </div>
+</div>
+
+<!-- ✅ タップ用ボタン -->
+<div id="keymap">
+  <div class="keybox" data-color="red">赤</div>
+  <div class="keybox" data-color="blue">青</div>
+  <div class="keybox" data-color="green">緑</div>
+  <div class="keybox" data-color="gold">黄</div>
+</div>
+
+<script>
+const texts = ["赤","青","緑","黄"];
+const colors = ["red","blue","green","gold"];
+
+let current;
+let startTime;
+let isRunning = false;
+let canRespond = false;
+let answered = false;
+
+let trialCount = 0;
+let csvLog = [];
+
+const timeLimit = 30000;
+let stimulusTimer;
+
+// ✅ スタート
+document.getElementById("startBtn").addEventListener("click", () => {
+
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen();
+  }
+
+  document.getElementById("word").classList.remove("start");
+  document.getElementById("guide").style.display = "none";
+
+  trialCount = 0;
+  csvLog = [];
+  isRunning = true;
+
+  showFixation();
+
+  setTimeout(endTest, timeLimit);
+});
+
+// ✅ ✖（500ms）
+function showFixation() {
+  if (!isRunning) return;
+
+  const wordDiv = document.getElementById("word");
+  wordDiv.textContent = "✖";
+  wordDiv.style.color = "black";
+
+  canRespond = false;
+
+  setTimeout(showStimulus, 500);
+}
+
+// ✅ 刺激（2000ms）
+function showStimulus() {
+  if (!isRunning) return;
+
+  const rand = Math.random();
+  let condition = rand < 0.25 ? 1 : rand < 0.75 ? 2 : 3;
+
+  let text, color;
+
+  if (condition === 1) {
+    let i = Math.floor(Math.random() * 4);
+    text = texts[i];
+    color = colors[i];
+
+  } else if (condition === 2) {
+    let i = Math.floor(Math.random() * 4);
+    let j;
+    do {
+      j = Math.floor(Math.random() * 4);
+    } while (j === i);
+
+    text = texts[i];
+    color = colors[j];
+
+  } else {
+    text = "●";
+    color = colors[Math.floor(Math.random() * 4)];
+  }
+
+  current = { text, color, condition };
+
+  const wordDiv = document.getElementById("word");
+
+  requestAnimationFrame(() => {
+    wordDiv.textContent = text;
+    wordDiv.style.color = color;
+
+    startTime = performance.now();
+    canRespond = true;
+    answered = false;
+  });
+
+  stimulusTimer = setTimeout(() => {
+
+    if (!answered) {
+      trialCount++;
+      csvLog.push([trialCount, current.condition, "", 0]);
+    }
+
+    showFixation();
+
+  }, 2000);
+}
+
+// ✅ タップ処理
+document.querySelectorAll(".keybox").forEach(box => {
+
+  const handle = () => {
+    if (!isRunning || !canRespond || answered) return;
+    handleAnswer(box.dataset.color);
+  };
+
+  box.addEventListener("touchstart", handle);
+  box.addEventListener("click", handle);
+});
+
+// ✅ 回答処理
+function handleAnswer(ans) {
+
+  answered = true;
+
+  const rt = Math.round(performance.now() - startTime);
+  const correct = ans === current.color ? 1 : 0;
+
+  trialCount++;
+  csvLog.push([trialCount, current.condition, rt, correct]);
+
+  canRespond = false;
+}
+
+// ✅ 終了
+function endTest() {
+  isRunning = false;
+
+  const wordDiv = document.getElementById("word");
+  wordDiv.textContent = "終了！";
+  wordDiv.style.color = "black";
+
+  let csv = "試行回数,条件,反応時間(ms),正誤\n";
+  csvLog.forEach(row => csv += row.join(",") + "\n");
+
+  const now = new Date();
+  const fileName =
+    now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,"0") +
+    String(now.getDate()).padStart(2,"0") + "_" +
+    String(now.getHours()).padStart(2,"0") +
+    String(now.getMinutes()).padStart(2,"0");
+
+  const blob = new Blob(["\uFEFF" + csv], {type:"text/csv"});
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "stroop_" + fileName + ".csv";
+  link.click();
+}
+</script>
+
+</body>
+</html>
