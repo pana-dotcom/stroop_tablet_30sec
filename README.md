@@ -1,0 +1,1 @@
+# stroop_tablet_30sec
