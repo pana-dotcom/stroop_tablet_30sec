@@ -2,243 +2,174 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Stroop test</title>
+<title>PVT 反応時間テスト</title>
+
 <style>
 body {
-  font-family: sans-serif;
-  text-align: center;
-  margin-top: 50px;
+    text-align: center;
+    font-family: Arial;
+    margin-top: 100px;
 }
-
-#instruction {
-  font-size: 28px;
-  font-weight: bold;
+#box {
+    width: 300px;
+    height: 200px;
+    background: gray;
+    margin: auto;
+    line-height: 200px;
+    font-size: 40px;
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
-
-#guide {
-  margin-top: 15px;
-  font-size: 32px;
-  font-weight: bold;
-  white-space: nowrap;
+#box.waiting {
+    font-size: 80px;
 }
-
-#word.start {
-  color: black;
-  text-decoration: underline;
+button{
+    margin-top:20px;
+    font-size:18px;
+    padding:10px 20px;
 }
-
-#word {
-  font-size: 64px;
-  margin: 40px;
-}
-
-button {
-  font-size: 18px;
-  margin: 5px;
-}
-
-#keymap {
-  margin-top: 40px;
-}
-
-.keybox {
-  display: inline-block;
-  width: 80px;
-  height: 80px;
-  margin: 10px;
-  text-align: center;
-  border: 3px solid #333;
-  border-radius: 10px;
-  line-height: 80px;
-  font-weight: bold;
-  font-size: 32px;
-  user-select: none;
-}
-
-.keybox:active {
-  background-color: #ddd;
+.instruction {
+    font-size: 40px;
+    font-weight: bold;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Stroopテスト</h1>
-<p id="instruction">色を回答！</p>
+<p class="instruction">赤になったらすぐタップ！</p>
 
-<div>
-  <div id="word" class="start">スタートを押してください</div>
+<button id="startBtn">テスト開始</button>
 
-  <div id="guide">
-    赤 / 青 / 緑 / 黄 をタップ
-  </div>
-
-  <div style="margin-top: 15px;">
-    <button id="startBtn">スタート</button>
-  </div>
-</div>
-
-<!-- ✅ タップ用ボタン -->
-<div id="keymap">
-  <div class="keybox" data-color="red">赤</div>
-  <div class="keybox" data-color="blue">青</div>
-  <div class="keybox" data-color="green">緑</div>
-  <div class="keybox" data-color="gold">黄</div>
-</div>
+<div id="box" class="waiting">✖</div>
 
 <script>
-const texts = ["赤","青","緑","黄"];
-const colors = ["red","blue","green","gold"];
+let testDuration = 30000; //30秒
+let testStartTime;
 
-let current;
 let startTime;
+let waiting = false;
 let isRunning = false;
-let canRespond = false;
-let answered = false;
 
-let trialCount = 0;
-let csvLog = [];
+let results = [];
 
-const timeLimit = 30000;
-let stimulusTimer;
+// ✅ 強制終了タイマー
+let forceEndTimer;
+
+const box = document.getElementById("box");
+const startBtn = document.getElementById("startBtn");
 
 // ✅ スタート
-document.getElementById("startBtn").addEventListener("click", () => {
+startBtn.addEventListener("click", () => {
+    results = [];
+    isRunning = true;
+    testStartTime = Date.now();
+    startBtn.disabled = true;
 
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen();
-  }
-
-  document.getElementById("word").classList.remove("start");
-  document.getElementById("guide").style.display = "none";
-
-  trialCount = 0;
-  csvLog = [];
-  isRunning = true;
-
-  showFixation();
-
-  setTimeout(endTest, timeLimit);
-});
-
-// ✅ ✖（500ms）
-function showFixation() {
-  if (!isRunning) return;
-
-  const wordDiv = document.getElementById("word");
-  wordDiv.textContent = "✖";
-  wordDiv.style.color = "black";
-
-  canRespond = false;
-
-  setTimeout(showStimulus, 500);
-}
-
-// ✅ 刺激（2000ms）
-function showStimulus() {
-  if (!isRunning) return;
-
-  const rand = Math.random();
-  let condition = rand < 0.25 ? 1 : rand < 0.75 ? 2 : 3;
-
-  let text, color;
-
-  if (condition === 1) {
-    let i = Math.floor(Math.random() * 4);
-    text = texts[i];
-    color = colors[i];
-
-  } else if (condition === 2) {
-    let i = Math.floor(Math.random() * 4);
-    let j;
-    do {
-      j = Math.floor(Math.random() * 4);
-    } while (j === i);
-
-    text = texts[i];
-    color = colors[j];
-
-  } else {
-    text = "●";
-    color = colors[Math.floor(Math.random() * 4)];
-  }
-
-  current = { text, color, condition };
-
-  const wordDiv = document.getElementById("word");
-
-  requestAnimationFrame(() => {
-    wordDiv.textContent = text;
-    wordDiv.style.color = color;
-
-    startTime = performance.now();
-    canRespond = true;
-    answered = false;
-  });
-
-  stimulusTimer = setTimeout(() => {
-
-    if (!answered) {
-      trialCount++;
-      csvLog.push([trialCount, current.condition, "", 0]);
+    // フルスクリーン（任意）
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
     }
 
-    showFixation();
+    // ✅ 強制終了（ここが追加の核心）
+    forceEndTimer = setTimeout(() => {
+        if (isRunning) {
+            endTest();
+        }
+    }, testDuration);
 
-  }, 2000);
+    startTest();
+});
+
+function startTest(){
+    if (!isRunning) return;
+
+    box.style.background = "gray";
+    box.classList.add("waiting");
+    box.textContent = "✖";
+    waiting = true;
+
+    let delay = Math.random() * 8000 + 2000;
+
+    setTimeout(() => {
+        if (!isRunning) return;
+
+        requestAnimationFrame(() => {
+            if (!isRunning) return;
+
+            box.style.background = "red";
+            box.classList.remove("waiting");
+            box.textContent = "タップ！";
+            startTime = performance.now();
+            waiting = false;
+        });
+    }, delay);
+}
+
+// ✅ 共通処理
+function handleResponse() {
+    if (!isRunning) return;
+
+    if (waiting) {
+        return; // フライング無視
+    }
+
+    let endTime = performance.now();
+    let reaction = Math.round(endTime - startTime);
+
+    results.push(reaction);
+
+    startTest();
 }
 
 // ✅ タップ処理
-document.querySelectorAll(".keybox").forEach(box => {
-
-  const handle = () => {
-    if (!isRunning || !canRespond || answered) return;
-    handleAnswer(box.dataset.color);
-  };
-
-  box.addEventListener("touchstart", handle);
-  box.addEventListener("click", handle);
-});
-
-// ✅ 回答処理
-function handleAnswer(ans) {
-
-  answered = true;
-
-  const rt = Math.round(performance.now() - startTime);
-  const correct = ans === current.color ? 1 : 0;
-
-  trialCount++;
-  csvLog.push([trialCount, current.condition, rt, correct]);
-
-  canRespond = false;
-}
+box.addEventListener("touchstart", handleResponse);
+box.addEventListener("click", handleResponse);
 
 // ✅ 終了
 function endTest() {
-  isRunning = false;
+    if (!isRunning) return;
 
-  const wordDiv = document.getElementById("word");
-  wordDiv.textContent = "終了！";
-  wordDiv.style.color = "black";
+    isRunning = false;
 
-  let csv = "試行回数,条件,反応時間(ms),正誤\n";
-  csvLog.forEach(row => csv += row.join(",") + "\n");
+    // ✅ タイマー解除
+    clearTimeout(forceEndTimer);
 
-  const now = new Date();
-  const fileName =
-    now.getFullYear() +
-    String(now.getMonth()+1).padStart(2,"0") +
-    String(now.getDate()).padStart(2,"0") + "_" +
-    String(now.getHours()).padStart(2,"0") +
-    String(now.getMinutes()).padStart(2,"0");
+    startBtn.disabled = false;
 
-  const blob = new Blob(["\uFEFF" + csv], {type:"text/csv"});
+    box.style.background = "black";
+    box.textContent = "終了";
 
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "stroop_" + fileName + ".csv";
-  link.click();
+    downloadCSV();
+}
+
+// ✅ CSV出力
+function downloadCSV() {
+    let now = new Date();
+
+    let fileName =
+        now.getFullYear() +
+        (now.getMonth()+1).toString().padStart(2,"0") +
+        now.getDate().toString().padStart(2,"0") + "_" +
+        now.getHours().toString().padStart(2,"0") +
+        now.getMinutes().toString().padStart(2,"0");
+
+    let csv = "trial,reaction_time_ms,lapse\n";
+
+    results.forEach((time, index) => {
+        let lapse = (time >= 500) ? 1 : 0;
+        csv += (index + 1) + "," + time + "," + lapse + "\n";
+    });
+
+    let blob = new Blob([csv], { type: "text/csv" });
+
+    let link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "pvt_" + fileName + ".csv";
+
+    link.click();
 }
 </script>
 
