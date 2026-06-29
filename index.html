@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Stroop test</title>
+
 <style>
 body {
   font-family: sans-serif;
@@ -105,9 +106,7 @@ let stimulusTimer;
 // ✅ スタート
 document.getElementById("startBtn").addEventListener("click", () => {
 
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen();
-  }
+  // ✅ フルスクリーン削除済み
 
   document.getElementById("word").classList.remove("start");
   document.getElementById("guide").style.display = "none";
