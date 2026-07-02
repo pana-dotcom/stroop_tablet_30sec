@@ -106,7 +106,8 @@ let stimulusTimer;
 // ✅ スタート
 document.getElementById("startBtn").addEventListener("click", () => {
 
-  // ✅ フルスクリーン削除済み
+  // スタートボタンを非表示
+  document.getElementById("startBtn").style.display = "none";
 
   document.getElementById("word").classList.remove("start");
   document.getElementById("guide").style.display = "none";
